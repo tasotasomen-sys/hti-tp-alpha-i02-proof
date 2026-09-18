@@ -1,0 +1,41 @@
+name: TP-alpha-I02 Protected Human Gate Proof
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  bind-candidate:
+    runs-on: ubuntu-latest
+    outputs:
+      candidate_sha: ${{ steps.bind.outputs.candidate_sha }}
+    steps:
+      - name: Bind exact PR candidate
+        id: bind
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.event.pull_request.head.sha }}" = "${{ github.sha }}" || true
+          echo "candidate_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          printf 'candidate_sha=%s\nbase_sha=%s\npr=%s\n'             "${{ github.event.pull_request.head.sha }}"             "${{ github.event.pull_request.base.sha }}"             "${{ github.event.pull_request.number }}"
+      - name: Validate proof candidate path
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${{ github.event.pull_request.head.sha }}"
+          test "${{ github.event.pull_request.base.ref }}" = "main"
+
+  human-promotion-gate:
+    needs: bind-candidate
+    runs-on: ubuntu-latest
+    environment: hti-human-promotion
+    steps:
+      - name: Revalidate exact candidate after Human gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.bind-candidate.outputs.candidate_sha }}" = "${{ github.event.pull_request.head.sha }}"
+          printf 'HUMAN_GATE_RELEASED_FOR=%s\n' "${{ needs.bind-candidate.outputs.candidate_sha }}"
